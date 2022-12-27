@@ -95,10 +95,7 @@ def check_response(response):
 
 
 def parse_status(homework):
-    """
-    Извлекает из информации о конкретной домашней работе
-    статус этой работы.
-    """
+    """Извлечение статуса работы домашнего задания."""
     if 'homework_name' not in homework:
         message = 'Отсутствует ключ "homework_name" в ответе API'
         logger.error(message)
