@@ -95,7 +95,8 @@ def check_response(response):
 
 
 def parse_status(homework):
-    """Извлекает из информации о конкретной домашней работе статус этой работы."""
+    """Извлекает из информации о конкретной домашней работе
+    статус этой работы."""
     if 'homework_name' not in homework:
         message = 'Отсутствует ключ "homework_name" в ответе API'
         logger.error(message)
@@ -109,7 +110,8 @@ def parse_status(homework):
         message = f'Неизвестный статус работы: {homework_status}'
         logger.error(message)
         raise Exception(message)
-    return (f'Изменился статус проверки работы "{homework.get("homework_name")}":'
+    return (f'Изменился статус проверки работы '
+            f'"{homework.get("homework_name")}":'
             f' {HOMEWORK_VERDICTS[homework_status]}')
 
 
