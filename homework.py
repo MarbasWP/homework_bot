@@ -1,14 +1,14 @@
-import exceptions
 import logging
 import os
-import requests
 import sys
-import telegram
 import time
-
 from http import HTTPStatus
+
+import requests
+import telegram
 from dotenv import load_dotenv
 
+import exceptions
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(sys.stdout)
