@@ -6,3 +6,8 @@ class InvalidResponseCodeError(Exception):
 class TelegramSendError(Exception):
     """Ошибка отправки сообщений"""
     pass
+
+
+class TokenError(Exception):
+    """Ошибка в токенах."""
+    pass
