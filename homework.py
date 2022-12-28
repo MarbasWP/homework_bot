@@ -157,7 +157,7 @@ def main():
 if __name__ == '__main__':
     main()
 
-    from unittest import TestCase, mock, main as uni_main
+    # from unittest import TestCase, mock, main as uni_main
     # ReqEx = requests.RequestException
     # JSON = {'error': 'testing'}
     # JSON = {'homeworks': [{'homework_name': 'test', 'status': 'test'}]}
