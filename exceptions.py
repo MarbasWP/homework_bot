@@ -11,3 +11,7 @@ class TelegramSendError(Exception):
 class TokenError(Exception):
     """Ошибка в токенах."""
     pass
+
+
+class StatusCodeError(Exception):
+    pass

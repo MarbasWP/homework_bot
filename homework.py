@@ -1,6 +1,5 @@
 import logging
 import os
-import sys
 import time
 from http import HTTPStatus
 
@@ -9,19 +8,8 @@ import telegram
 from dotenv import load_dotenv
 from requests import RequestException
 
-from exceptions import TokenError, InvalidResponseCodeError, TelegramSendError
-
-logging.basicConfig(filename='__file__' + '.log', level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-handler = logging.StreamHandler(sys.stdout)
-logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter(
-    ('%(asctime)s - %(levelname)s '
-     '- %(message)s - %(filename)s '
-     '- %(funcName)s - %(lineno)d строка')
-)
-handler.setFormatter(formatter)
+from exceptions import (InvalidResponseCodeError,
+                        TelegramSendError, StatusCodeError)
 
 load_dotenv()
 
@@ -39,10 +27,12 @@ HOMEWORK_VERDICTS = {
 }
 
 TOKEN_NOT_FOUND = 'Токен {} не найден!'
-RESPONSE_ERROR = ("Ошибка соединения, статус: {status} "
-                  "Причина: {reason}, {text} "
-                  "endpoint: {url}, headers: {headers} "
-                  "params: {params}")
+STATUS_ERROR = ('Ошибка соединения, статус: {status} '
+                'Причина: {reason}, {text} '
+                'endpoint: {url}, headers: {headers} '
+                'params: {params}')
+KEY_ERROR = ('Отказ от обслуживания: {error}, key {key}.'
+             ' endpoint: {url}, headers: {headers} params: {params}')
 CONNECT_ERROR = ("Ошибка {error} подключения к {url}."
                  " UNIX время в запросе: {params}.")
 CHANGED_STATUS = ('Изменился статус проверки работы "{homework_name}".'
@@ -68,12 +58,12 @@ def check_tokens():
 def send_message(bot, message):
     """Отправляет сообщение в telegram."""
     try:
-        logger.debug('Отправка сообщения в Телеграм.')
+        logging.debug('Отправка сообщения в Телеграм.')
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
     except telegram.error.TelegramError as error:
         message_error = SEND_MESSAGE_ERROR.format(
             message=message, error=error)
-        logger.error(message_error, exc_info=True)
+        logging.error(message_error, exc_info=True)
         raise TelegramSendError(message_error)
 
 
@@ -91,14 +81,24 @@ def get_api_answer(timestamp):
             CONNECT_ERROR.format(**parameters, error=error)
         )
     if response.status_code != HTTPStatus.OK:
-        raise InvalidResponseCodeError(
-            RESPONSE_ERROR.format(
+        raise StatusCodeError(
+            STATUS_ERROR.format(
                 status=response.status_code,
                 reason=response.reason,
                 text=response.text,
                 **parameters
             )
         )
+    response_json = response.json()
+    for key in ('error', 'code'):
+        if key in response_json:
+            raise InvalidResponseCodeError(
+                KEY_ERROR.format(
+                    error=response_json[key],
+                    key=key,
+                    **parameters
+                )
+            )
     return response.json()
 
 
@@ -112,7 +112,7 @@ def check_response(response):
     homeworks = response['homeworks']
     if not isinstance(homeworks, list):
         raise TypeError(
-            ERROR_NOT_LIST.format(type=type(response)))
+            ERROR_NOT_LIST.format(type=type(homeworks)))
     return homeworks
 
 
@@ -133,7 +133,7 @@ def parse_status(homework):
 def main():
     """Основная логика работы бота."""
     if not check_tokens():
-        raise TokenError(TOKEN_ERROR)
+        raise ValueError(TOKEN_ERROR)
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
     while True:
@@ -142,19 +142,29 @@ def main():
             homeworks = check_response(response)
             if homeworks:
                 send_message(bot, parse_status(homeworks[0]))
+            else:
+                continue
             timestamp = response.get('current_date', timestamp)
         except Exception as error:
             message = ERROR_MESSAGE.format(error)
-            logger.error(message)
+            logging.exception(message)
             try:
-                bot.send_message(TELEGRAM_CHAT_ID, message)
+                send_message(bot, message)
             except Exception as error:
-                logger.exception(SEND_MESSAGE_ERROR.format(error))
+                logging.error(SEND_MESSAGE_ERROR.format(error))
         finally:
             time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        filename='__file__' + '.log',
+        level=logging.DEBUG,
+        format=(
+            '%(asctime)s - %(filename)s - %(levelname)s '
+            '- %(funcName)s - %(lineno)d строка '
+            '- %(message)s'
+        ))
     main()
 
     # from unittest import TestCase, mock, main as uni_main
