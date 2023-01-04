@@ -38,27 +38,28 @@ CONNECT_ERROR = ("Ошибка {error} подключения к {url}."
 CHANGED_STATUS = ('Изменился статус проверки работы "{homework_name}".'
                   ' {verdicts}')
 TOKEN_ERROR = 'Ошибка в токенах.'
+SEND_MESSAGE = 'Отправка сообщения в Телеграм: {}'
 ERROR_MESSAGE = 'Сбой в работе программы: {}'
 SEND_MESSAGE_ERROR = 'Ошибка при отправке сообщения: {message}. {error}'
 ERROR_NOT_DICT = 'Ответ вернул не словарь, а {type}'
 ERROR_NOT_LIST = 'Ошибка: домашка - не список, а {type}'
 ERROR_STATUS = 'Неизвестный статус работы: {status}'
+ERROR_NOT_STATUS = 'Отсутствует ключ "status" в ответе API'
+ERROR_NOT_HOMEWORK = 'Отсутствует ключ "homework_name" в ответе API'
 
 
 def check_tokens():
     """Проверяем, что есть все токены."""
-    flag = True
     for name in TOKENS:
         if globals()[name] is None:
             logging.critical(TOKEN_NOT_FOUND.format(name))
-            flag = False
-    return flag
+            raise ValueError(TOKEN_ERROR)
 
 
 def send_message(bot, message):
     """Отправляет сообщение в telegram."""
     try:
-        logging.debug('Отправка сообщения в Телеграм.')
+        logging.debug(SEND_MESSAGE.format(message))
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
     except telegram.error.TelegramError as error:
         message_error = SEND_MESSAGE_ERROR.format(
@@ -99,7 +100,7 @@ def get_api_answer(timestamp):
                     **parameters
                 )
             )
-    return response.json()
+    return response_json
 
 
 def check_response(response):
@@ -119,9 +120,9 @@ def check_response(response):
 def parse_status(homework):
     """Извлечение статуса работы домашнего задания."""
     if 'homework_name' not in homework:
-        raise KeyError('Отсутствует ключ "homework_name" в ответе API')
+        raise KeyError(ERROR_NOT_HOMEWORK)
     if 'status' not in homework:
-        raise KeyError('Отсутствует ключ "status" в ответе API')
+        raise KeyError(ERROR_NOT_STATUS)
     status = homework['status']
     if status not in HOMEWORK_VERDICTS:
         raise ValueError(ERROR_STATUS.format(status))
@@ -132,18 +133,16 @@ def parse_status(homework):
 
 def main():
     """Основная логика работы бота."""
-    if not check_tokens():
-        raise ValueError(TOKEN_ERROR)
+    check_tokens()
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
     while True:
         try:
             response = get_api_answer(timestamp)
             homeworks = check_response(response)
-            if homeworks:
-                send_message(bot, parse_status(homeworks[0]))
-            else:
+            if not homeworks:
                 continue
+            send_message(bot, parse_status(homeworks[0]))
             timestamp = response.get('current_date', timestamp)
         except Exception as error:
             message = ERROR_MESSAGE.format(error)
